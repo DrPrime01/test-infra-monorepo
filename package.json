@@ -1,0 +1,17 @@
+{
+  "name": "test-infra-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/test-infra-ui",
+    "build:web": "npm run build --workspace=apps/test-infra-ui",
+    "build:cli": "npm run build --workspace=packages/cli"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.0"
+  }
+}
