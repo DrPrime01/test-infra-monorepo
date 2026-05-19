@@ -3,10 +3,7 @@
 import { stripe } from "./client";
 import { redirect } from "next/navigation";
 
-export async function createCheckoutSession(
-  priceId: string,
-  customerId?: string,
-) {
+export async function createCheckoutSession(priceId: string, customerId?: string) {
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
@@ -16,15 +13,5 @@ export async function createCheckoutSession(
   });
 
   if (!session.url) throw new Error("Failed to create checkout session");
-
-  redirect(session.url);
-}
-
-export async function createPortalSession(customerId: string) {
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
-  });
-
   redirect(session.url);
 }

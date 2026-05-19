@@ -13,16 +13,6 @@ export async function handleStripeEvent(event: Stripe.Event) {
       });
       break;
     }
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as Stripe.Subscription;
-      await adapter.updateSubscription({
-        stripeCustomerId: subscription.customer as string,
-        stripeSubscriptionId: subscription.id,
-        priceId: subscription.items.data[0].price.id,
-        status: "canceled",
-      });
-      break;
-    }
     default:
       console.log(`Unhandled event type ${event.type}`);
   }

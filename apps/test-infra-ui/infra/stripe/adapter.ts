@@ -1,26 +1,14 @@
-export interface StripeAdapter {
-  createCustomer: (email: string, name?: string) => Promise<string>;
-  updateSubscription: (data: {
-    stripeCustomerId: string;
-    stripeSubscriptionId: string;
-    status: string;
-    priceId: string;
-  }) => Promise<void>;
-}
+import { db } from "@/lib/db"; // Adjust this import to your Prisma client
 
-/**
- * 🛠️ ADAPTER IMPLEMENTATION
- * The CLI will attempt to auto-fill this based on your ORM.
- */
-export const adapter: StripeAdapter = {
-  createCustomer: async (email, name) => {
-    // Example: return (await db.user.create({ data: { email } })).id;
-    console.log("Creating customer in DB for:", email, name);
-    return "temp_customer_id";
-  },
-
-  updateSubscription: async (data) => {
-    // Example: await db.subscription.upsert({ ... });
-    console.log("Syncing subscription to DB:", data);
-  },
+export const adapter = {
+  updateSubscription: async (data: any) => {
+    await db.user.update({
+      where: { stripeCustomerId: data.stripeCustomerId },
+      data: {
+        stripeSubscriptionId: data.stripeSubscriptionId,
+        status: data.status,
+        priceId: data.priceId
+      }
+    });
+  }
 };
