@@ -2,14 +2,12 @@ import fs from "fs-extra";
 import path from "path";
 import { DetectedORM } from "./scanner.js";
 
-const REGISTRY_URL =
-  "https://raw.githubusercontent.com/your-username/infra-ui-registry/main/stripe.json";
-
-export async function generateStripeComponent(
+export async function generateComponent(
   projectRoot: string,
   orm: DetectedORM,
+  component: string,
 ) {
-  // 1. Fetch the remote payload
+  const REGISTRY_URL = `https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry/${component}.json`;
   const response = await fetch(REGISTRY_URL);
 
   if (!response.ok) {
@@ -25,14 +23,14 @@ export async function generateStripeComponent(
   const baseDir = hasSrcDirectory ? "src" : "";
 
   // set target folders
-  const infraDir = path.join(projectRoot, baseDir, "infra", "stripe");
+  const infraDir = path.join(projectRoot, baseDir, "infra", component);
   const apiDir = path.join(
     projectRoot,
     baseDir,
     "app",
     "api",
     "webhooks",
-    "stripe",
+    component,
   );
 
   // 3. Create the directories if they don't exist
@@ -40,34 +38,23 @@ export async function generateStripeComponent(
   await fs.ensureDir(apiDir);
 
   // 4. Write the files to the target locations
-  const filesToWrite = [
-    {
-      name: "client.ts",
-      content: payload.files["client.ts"],
-      dir: infraDir,
-    },
-    {
-      name: "actions.ts",
-      content: payload.files["actions.ts"],
-      dir: infraDir,
-    },
-    {
-      name: "webhooks.ts",
-      content: payload.files["webhooks.ts"],
-      dir: infraDir,
-    },
-    { name: "route.ts", content: payload.files["route.ts"], dir: apiDir },
-  ];
+  const filesToWrite: { name: string; content: string; dir: string }[] =
+    Object.entries(payload.files).map(([filename, content]) => ({
+      name: filename,
+      content: content as string,
+      dir: filename === "route.ts" ? apiDir : infraDir,
+    }));
 
   for (const file of filesToWrite) {
     await fs.outputFile(path.join(file.dir, file.name), file.content);
   }
 
-  // 5. Inject the Smart Adapter based on the detected ORM
+  // 5. Inject the Smart Adapter based on the detected ORM if the component requires one
   // Fallback to manual if we don't have a specific snippet for their ORM
-  const adapterContent = payload.adapters[orm] || payload.adapters["manual"];
-
-  await fs.outputFile(path.join(infraDir, "adapter.ts"), adapterContent);
+  if (payload.adapters) {
+    const adapterContent = payload.adapters[orm] || payload.adapters["manual"];
+    await fs.outputFile(path.join(infraDir, "adapter.ts"), adapterContent);
+  }
 
   return {
     dependencies: payload.dependencies || [],

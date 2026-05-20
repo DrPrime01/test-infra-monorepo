@@ -1,161 +1,191 @@
 #!/usr/bin/env node
+import { Command } from "commander";
 import { exec } from "child_process";
 import util from "util";
-
+import fs from "fs-extra";
+import path from "path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-
 import { detectEnvironment, DetectedORM } from "./scanner.js";
-import { generateStripeComponent } from "./generator.js";
+import { generateComponent } from "./generator.js";
 
-// Convert callback-based exec to Promise-based so we can 'await' it
 const execAsync = util.promisify(exec);
+const program = new Command();
 
-async function main() {
-  // clear console and show header
-  console.clear();
-  p.intro(pc.bgCyan(pc.black("Welcome to Infra UI CLI")));
+program
+  .name("infra-ui")
+  .description("Add critical infrastructure components to your app")
+  .version("0.1.0");
 
-  const projectRoot = process.cwd();
+// ==========================================
+// COMMAND: INIT
+// ==========================================
+program
+  .command("init")
+  .description("Initialize configuration and setup infra.json")
+  .action(async () => {
+    console.clear();
+    p.intro(pc.bgCyan(pc.black(" infra-ui init ")));
 
-  // 1. Run the Auto-detector spinner (UX)
-  const s = p.spinner();
-  s.start("Analysing your project structure...");
+    const projectRoot = process.cwd();
+    const configPath = path.join(projectRoot, "infra.json");
 
-  const env = await detectEnvironment(projectRoot);
-  await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate some delay for better UX
-  s.stop("Project analysis complete!");
+    // 1. Check if config already exists
+    if (await fs.pathExists(configPath)) {
+      const overwrite = await p.confirm({
+        message:
+          "An infra.json file already exists. Do you want to overwrite it?",
+        initialValue: false,
+      });
 
-  let chosenORM: DetectedORM | null = env.orm || null;
+      if (p.isCancel(overwrite) || !overwrite) {
+        p.cancel("Initialization aborted.");
+        process.exit(0);
+      }
+    }
 
-  // 2. Fallback menu if no ORM detected
-  if ((env.orm = "UNKNOWN")) {
-    (p.note(
-      "We couldn't automatically detect your ORM.\n No worries! You can manually select your setup below",
-    ),
-      "Auto-Detection Failed");
+    // 2. Scan the environment
+    const s = p.spinner();
+    s.start("Scanning your project structure...");
+    const env = await detectEnvironment(projectRoot);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    s.stop("Project analysis complete!");
 
-    const selection = await p.select({
-      message: "Which database ORM or tool are you using for this project?",
-      options: [
-        {
-          value: "prisma",
-          label: "Prisma",
-          hint: "Pre-configures Prisma schema sync",
-        },
-        {
-          value: "drizzle-orm",
-          label: "Drizzle ORM",
-          hint: "Pre-configures SQL dialect schema sync",
-        },
-        {
-          value: "supabase",
-          label: "Supabase Js",
-          hint: "Pre-configures client-side or edge table sync",
-        },
-        { value: "typeorm", label: "TypeORM" },
-        { value: "sequelize", label: "Sequelize" },
-        { value: "mikro-orm", label: "MikroORM" },
-        { value: "typeorm-legacy", label: "TypeORM (Legacy)" },
-        { value: "objection", label: "Objection.js" },
-        { value: "knex", label: "Knex.js" },
-        { value: "typeorm-next", label: "TypeORM (Next)" },
-        { value: "typeorm-legacy-next", label: "TypeORM (Legacy Next)" },
-        {
-          value: "manual",
-          label: "None / Custom Setup",
-          hint: "Gives you an empty boilerplate adapter to fill out yourself",
-        },
-      ],
+    let chosenORM: DetectedORM | null = env.orm || null;
+
+    // 3. Fallback menu if scanning fails
+    if (env.orm === "UNKNOWN") {
+      const selection = await p.select({
+        message: "Which database ORM or tool are you using?",
+        options: [
+          { value: "prisma", label: "Prisma" },
+          { value: "drizzle-orm", label: "Drizzle ORM" },
+          { value: "supabase", label: "Supabase JS" },
+          { value: "manual", label: "None / Custom Setup" },
+        ],
+      });
+
+      if (p.isCancel(selection)) {
+        p.cancel("Aborted.");
+        process.exit(0);
+      }
+      chosenORM = selection as DetectedORM;
+    }
+
+    // 4. Save the configuration
+    const config = {
+      packageManager: env.packageManager,
+      orm: chosenORM,
+      basePath: env.basePath,
+    };
+
+    await fs.outputJson(configPath, config, { spaces: 2 });
+
+    p.outro(
+      `🎉 ${pc.green("Success!")} Created ${pc.cyan("infra.json")} at the root of your project.`,
+    );
+  });
+
+// ==========================================
+// COMMAND: ADD
+// ==========================================
+program
+  .command("add <component>")
+  .description("Add a new infrastructure component to your project")
+  .action(async (component: string) => {
+    const supported = ["stripe", "resend", "twilio"];
+    if (!supported.includes(component)) {
+      p.log.error(`Component "${component}" is not supported yet.`);
+      p.log.info(`Available components: ${supported.join(", ")}`);
+      process.exit(1);
+    }
+
+    console.clear();
+    p.intro(pc.bgCyan(pc.black(` Installing ${component} `)));
+
+    const projectRoot = process.cwd();
+    const configPath = path.join(projectRoot, "infra.json");
+
+    // 1. Enforce the config file requirement
+    if (!(await fs.pathExists(configPath))) {
+      p.log.error(
+        `Configuration file missing. Please run ${pc.green("npx infra-ui init")} first.`,
+      );
+      process.exit(1);
+    }
+
+    // 2. Read preferences from infra.json
+    const config = await fs.readJson(configPath);
+    const chosenORM = config.orm as DetectedORM;
+    const pm = config.packageManager || "npm";
+
+    // 3. Confirm target directory
+    const confirmInstall = await p.confirm({
+      message: `Install ${pc.green(component)} into ${pc.cyan("./infra/" + component)}?`,
+      initialValue: true,
     });
 
-    // Hander user cancelling out via CTRL+C
-    if (p.isCancel(selection)) {
-      p.cancel("Installation aborted.");
+    if (p.isCancel(confirmInstall) || !confirmInstall) {
+      p.cancel("Aborted.");
       process.exit(0);
     }
 
-    chosenORM = selection as DetectedORM;
-  } else {
-    p.log.success(`Detected ${pc.green(env.orm)} in your project!`);
-  }
+    const targetDir = path.join(
+      projectRoot,
+      config.basePath || "",
+      "infra",
+      component,
+    );
 
-  // 3. Confirm installation target
-  const confirmInstall = await p.confirm({
-    message: `Ready to install the Stripe infra component into ${pc.cyan("./infra/stripe")}?`,
-    initialValue: true,
-  });
-
-  if (p.isCancel(confirmInstall) || !confirmInstall) {
-    p.cancel("Installation aborted.");
-    process.exit(0);
-  }
-
-  // 4. Fire the file generation
-  const installSpinner = p.spinner();
-  installSpinner.start(
-    `Injecting Stripe scaffolding tailored for ${chosenORM}...`,
-  );
-
-  try {
-    // Calling the remote fetcher and writer
-    const result = await generateStripeComponent(projectRoot, chosenORM!);
-    installSpinner.stop(pc.green("Component successfully generated."));
-
-    // (Optional) We can log dependencies they need to install
-    if (result.dependencies && result.dependencies.length > 0) {
-      const depSpinner = p.spinner();
-      const depsToInstall = result.dependencies.join(" ");
-
-      const pm = env.packageManager;
-      let installCmd = "";
-
-      if (pm === "npm") installCmd = `npm install ${depsToInstall} --silent`;
-      if (pm === "pnpm") installCmd = `pnpm add ${depsToInstall} --silent`;
-      if (pm === "bun") installCmd = `bun add ${depsToInstall} --silent`;
-      if (pm === "yarn") installCmd = `yarn add ${depsToInstall} --silent`;
-
-      depSpinner.start(
-        `Installing required dependencies (${depsToInstall}). This might take a moment...`,
+    // If the folder already exists, warn the user!
+    if (await fs.pathExists(targetDir)) {
+      p.log.warn(
+        `The ${pc.yellow(component)} component already exists in your project.`,
       );
 
-      try {
-        // Run npm install in the background inside the user's project folder
-        await execAsync(installCmd, {
-          cwd: projectRoot,
-        });
-        depSpinner.stop(pc.green("Dependencies installed successfully."));
-      } catch (npmErr) {
-        // Graceful fallback if the auto-install fails (e.g. network timeout)
-        depSpinner.stop(pc.red("Auto-install failed."));
-        const manualCmd = pm === "npm" ? `npm install` : `${pm} add`;
-        p.note(
-          `We couldn't install the dependencies automatically. Please run:\n${pc.cyan(manualCmd + ` ${depsToInstall}`)}`,
-          "Manual Step Required",
-        );
+      const overwrite = await p.confirm({
+        message: pc.red(
+          "Do you want to overwrite it? All custom changes will be lost!",
+        ),
+        initialValue: false, // Default to NO for safety
+      });
+
+      if (p.isCancel(overwrite) || !overwrite) {
+        p.cancel("Installation safely aborted. Your files were not changed.");
+        process.exit(0);
       }
     }
-  } catch (error: any) {
-    installSpinner.stop(pc.red("Failed to generate component."));
-    p.cancel(`Error: ${error.message}`);
-    process.exit(1);
-  }
 
-  // 5. Outro and Next steps
+    // 4. Generate the component
+    const installSpinner = p.spinner();
+    installSpinner.start(`Generating files tailored for ${chosenORM}...`);
 
-  p.outro(
-    `🎉 ${pc.green("Stripe Infra Block added successfully!")}\n\n` +
-      `${pc.bold("Next steps:")}\n` +
-      ` 1. Add your ${pc.cyan("STRIPE_SECRET_KEY")} to your .env file.\n` +
-      ` 2. Open ${pc.cyan("./infra/stripe/adapter.ts")} to verify your DB mapping.\n` +
-      ` 3. Run your local dev server and test your webhooks!`,
-  );
+    try {
+      const result = await generateComponent(projectRoot, chosenORM, component);
+      installSpinner.stop(pc.green("Files generated."));
 
-  main().catch((err) => {
-    `🎉 ${pc.green("Stripe Infra Block added successfully!")}\n\n` +
-      `${pc.bold("Next steps:")}\n` +
-      ` 1. Add your ${pc.cyan("STRIPE_SECRET_KEY")} to your .env file.\n` +
-      ` 2. Open ${pc.cyan("./infra/stripe/adapter.ts")} to verify your DB mapping.\n` +
-      ` 3. Run your local dev server and test your webhooks!`;
+      // 5. Install dependencies
+      if (result.dependencies && result.dependencies.length > 0) {
+        const depSpinner = p.spinner();
+        const depsToInstall = result.dependencies.join(" ");
+
+        let installCmd = `${pm} install ${depsToInstall} --silent`;
+        if (pm === "yarn" || pm === "pnpm" || pm === "bun") {
+          installCmd = `${pm} add ${depsToInstall} --silent`;
+        }
+
+        depSpinner.start(`Installing dependencies via ${pm}...`);
+        await execAsync(installCmd, { cwd: projectRoot });
+        depSpinner.stop(pc.green("Dependencies installed."));
+      }
+    } catch (error: any) {
+      installSpinner.stop(pc.red("Failed."));
+      p.cancel(error.message);
+      process.exit(1);
+    }
+
+    p.outro(`🎉 ${pc.green(`${component} added successfully!`)}`);
   });
-}
+
+// Execute Commander
+program.parse(process.argv);
