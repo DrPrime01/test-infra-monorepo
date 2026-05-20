@@ -1,0 +1,5 @@
+{
+  "packageManager": "npm",
+  "orm": "prisma",
+  "basePath": ""
+}
