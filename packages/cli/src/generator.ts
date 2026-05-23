@@ -41,8 +41,8 @@ export async function generateComponent(
   const baseDir = hasSrcDirectory ? "src" : "";
   const rootTargetDir = path.join(projectRoot, baseDir);
 
-  // next-auth files live under infra/auth/ so auth.ts can import "./infra/auth/adapter"
-  const infraComponentName = component === "next-auth" ? "auth" : component;
+  // authjs files live under infra/auth/ so auth.ts can import "./infra/auth/adapter"
+  const infraComponentName = component === "authjs" ? "auth" : component;
   const infraDir = path.join(projectRoot, baseDir, "infra", infraComponentName);
 
   const writePromises: Promise<void>[] = [];
@@ -51,7 +51,7 @@ export async function generateComponent(
     for (const [fileName, content] of Object.entries(payload.files)) {
       let fileContent = content as string;
 
-      if (fileName === "auth.ts" && component === "next-auth") {
+      if (fileName === "auth.ts" && component === "authjs") {
         let imports = "";
         let array = "";
         const providers = options?.providers ?? [];
@@ -66,7 +66,7 @@ export async function generateComponent(
         writePromises.push(
           fs.outputFile(path.join(rootTargetDir, fileName), fileContent),
         );
-      } else if (fileName === "route.ts" && component === "next-auth") {
+      } else if (fileName === "route.ts" && component === "authjs") {
         const apiDir = path.join(
           projectRoot,
           baseDir,
@@ -99,7 +99,7 @@ export async function generateComponent(
 
   await Promise.all(writePromises);
 
-  if (component === "next-auth") {
+  if (component === "authjs") {
     let nextVersion = 15;
     try {
       const userPkg = await fs.readJson(path.join(projectRoot, "package.json"));

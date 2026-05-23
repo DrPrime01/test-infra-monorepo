@@ -142,7 +142,7 @@ program
   .command("add <component>")
   .description("Add a new infrastructure component to your project")
   .action(async (component: string) => {
-    const supported = ["stripe", "resend", "twilio", "next-auth"];
+    const supported = ["stripe", "resend", "twilio", "authjs"];
     if (!supported.includes(component)) {
       p.log.error(`Component "${component}" is not supported yet.`);
       p.log.info(`Available components: ${supported.join(", ")}`);
@@ -180,7 +180,7 @@ program
       env: {},
     };
 
-    if (component === "next-auth") {
+    if (component === "authjs") {
       const providerSelection = await p.multiselect({
         message: "Which authentication providers do you want to configure?",
         options: [
@@ -231,8 +231,8 @@ program
     }
     // ------------------------------------
 
-    // next-auth files are written into infra/auth/ — show the real path
-    const displayComponent = component === "next-auth" ? "auth" : component;
+    // authjs files are written into infra/auth/ — show the real path
+    const displayComponent = component === "authjs" ? "auth" : component;
 
     const confirmInstall = await p.confirm({
       message: `Install ${pc.green(component)} into ${pc.cyan("./infra/" + displayComponent)}?`,
@@ -284,7 +284,7 @@ program
       // Only inject adapters that actually exist in the @auth/* namespace
       const AUTH_ADAPTER_SUPPORTED_ORMS = ["prisma", "drizzle-orm"];
       if (
-        component === "next-auth" &&
+        component === "authjs" &&
         AUTH_ADAPTER_SUPPORTED_ORMS.includes(chosenORM)
       ) {
         result.dependencies.push(`@auth/${chosenORM}-adapter`);
