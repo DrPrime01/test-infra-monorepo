@@ -1,0 +1,16 @@
+{
+  "dependencies": ["next-auth@beta"],
+  "files": {
+    "auth.ts": "import NextAuth from \"next-auth\";\n{{PROVIDER_IMPORTS}}\nimport { adapter } from \"./infra/auth/adapter\";\n\nexport const { handlers, auth, signIn, signOut } = NextAuth({\n  adapter,\n  providers: [\n{{PROVIDER_ARRAY}}\n  ],\n  callbacks: {\n    session({ session, user }) {\n      if (session.user) {\n        session.user.id = user.id;\n      }\n      return session;\n    },\n  },\n});",
+    "route.ts": "import { handlers } from \"@/auth\";\n\nexport const { GET, POST } = handlers;"
+  },
+  "adapters": {
+    "prisma": "import { PrismaAdapter } from \"@auth/prisma-adapter\";\nimport { db } from \"@/lib/db\";\n\nexport const adapter = PrismaAdapter(db);",
+    "drizzle-orm": "import { DrizzleAdapter } from \"@auth/drizzle-adapter\";\nimport { db } from \"@/lib/db\";\n\nexport const adapter = DrizzleAdapter(db);",
+    "manual": "// Custom adapter placeholder — implement the Auth.js Adapter interface\nexport const adapter = undefined;"
+  },
+  "middlewareTemplates": {
+    "legacy": "import { auth } from \"./auth\";\n\nexport default auth((req) => {\n  // Your custom middleware code sits here\n});\n\nexport const config = {\n  matcher: [\"/((?!api|_next/static|_next/image|favicon.ico).*)\"],\n};",
+    "proxy": "import { auth } from \"./auth\";\nimport type { NextRequest } from \"next/server\";\n\nexport async function proxy(request: NextRequest) {\n  const session = await auth();\n  // Your custom proxy code sits here\n}\n\nexport const config = {\n  matcher: [\"/((?!api|_next/static|_next/image|favicon.ico).*)\"],\n};"
+  }
+}
