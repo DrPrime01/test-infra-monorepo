@@ -1,7 +1,11 @@
 {
   "dependencies": ["next-auth@beta"],
+  "envSectionHeader": "# Auth.js Configuration",
+  "conditionalDeps": [
+    { "when": { "ormIn": ["prisma", "drizzle-orm"] }, "deps": ["@auth/{{orm}}-adapter"] }
+  ],
   "files": {
-    "auth.ts": "import NextAuth from \"next-auth\";\n{{PROVIDER_IMPORTS}}\nimport { adapter } from \"./infra/auth/adapter\";\n\nexport const { handlers, auth, signIn, signOut } = NextAuth({\n  adapter,\n  providers: [\n{{PROVIDER_ARRAY}}\n  ],\n  callbacks: {\n    session({ session, user }) {\n      if (session.user) {\n        session.user.id = user.id;\n      }\n      return session;\n    },\n  },\n});",
+    "auth.ts": "import NextAuth from \"next-auth\";\n{{PROVIDER_IMPORTS}}\nimport { adapter } from \"./infra/auth/adapter\";\n\nexport const { handlers, auth, signIn, signOut } = NextAuth({\n  adapter,\n  providers: [\n{{PROVIDER_ARRAY}}\n  ],\n  callbacks: {\n    // Works for both database sessions (user provided) and JWT sessions\n    // (token provided). With Credentials provider you'll see the JWT path.\n    session({ session, token, user }) {\n      if (session.user) {\n        if (user?.id) session.user.id = user.id;\n        else if (token?.sub) session.user.id = token.sub;\n      }\n      return session;\n    },\n  },\n});",
     "route.ts": "import { handlers } from \"@/auth\";\n\nexport const { GET, POST } = handlers;"
   },
   "adapters": {

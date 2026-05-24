@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "name": "stripe",
+      "description": "Subscription billing with Stripe Checkout + webhooks",
+      "category": "payments"
+    },
+    {
+      "name": "paystack",
+      "description": "Paystack payments via Inline.js + webhooks",
+      "category": "payments"
+    },
+    {
+      "name": "resend",
+      "description": "Transactional email via Resend",
+      "category": "email"
+    },
+    {
+      "name": "twilio",
+      "description": "Twilio Programmable SMS, Voice, and Verify (2FA)",
+      "category": "communications"
+    },
+    {
+      "name": "authjs",
+      "description": "Auth.js (NextAuth v5) with OAuth providers",
+      "category": "auth"
+    },
+    {
+      "name": "clerk",
+      "description": "Clerk authentication with sign-in/sign-up pages",
+      "category": "auth"
+    }
+  ]
+}

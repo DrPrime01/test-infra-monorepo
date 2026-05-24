@@ -16,16 +16,23 @@ export async function POST(req: Request) {
     return new Response("Server misconfiguration", { status: 500 });
   }
 
+  let event;
   try {
-    const event = stripe.webhooks.constructEvent(
+    event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET
+      process.env.STRIPE_WEBHOOK_SECRET,
     );
+  } catch (err: unknown) {
+    console.error("[stripe webhook] signature verification failed", err);
+    return new Response("Bad request", { status: 400 });
+  }
+
+  try {
     await handleStripeEvent(event);
     return new Response("OK", { status: 200 });
   } catch (err: unknown) {
-    console.error("[stripe webhook]", err);
-    return new Response("Bad request", { status: 400 });
+    console.error("[stripe webhook] handler error", err);
+    return new Response("Internal error", { status: 500 });
   }
 }
