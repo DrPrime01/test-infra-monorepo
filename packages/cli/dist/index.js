@@ -116,7 +116,7 @@ program
     .command("add <component>")
     .description("Add a new infrastructure component to your project")
     .action(async (component) => {
-    const supported = ["stripe", "resend", "twilio", "authjs", "clerk"];
+    const supported = ["stripe", "resend", "twilio", "authjs", "clerk", "paystack"];
     if (!supported.includes(component)) {
         p.log.error(`Component "${component}" is not supported yet.`);
         p.log.info(`Available components: ${supported.join(", ")}`);
@@ -211,6 +211,25 @@ program
             "whsec_YOUR_WEBHOOK_SECRET_HERE";
     }
     // ---------------------------
+    // --- PAYSTACK KEY PROMPTING ---
+    if (component === "paystack") {
+        p.note("Provide your Paystack API keys from the Paystack dashboard.");
+        const secretKey = await p.text({
+            message: "PAYSTACK_SECRET_KEY:",
+            placeholder: "sk_test_...",
+        });
+        if (p.isCancel(secretKey))
+            process.exit(0);
+        const publicKey = await p.text({
+            message: "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY:",
+            placeholder: "pk_test_...",
+        });
+        if (p.isCancel(publicKey))
+            process.exit(0);
+        componentOptions.env["PAYSTACK_SECRET_KEY"] = secretKey;
+        componentOptions.env["NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"] = publicKey;
+    }
+    // ------------------------------
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;
     const confirmInstall = await p.confirm({
