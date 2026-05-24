@@ -261,6 +261,47 @@ program
     }
     // ---------------------------
 
+    // --- TWILIO KEY PROMPTING ---
+    if (component === "twilio") {
+      p.note(
+        "Provide your Twilio credentials from the Twilio Console (console.twilio.com).",
+      );
+
+      const accountSid = await p.text({
+        message: "TWILIO_ACCOUNT_SID:",
+        placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      });
+      if (p.isCancel(accountSid)) process.exit(0);
+
+      const authToken = await p.text({
+        message: "TWILIO_AUTH_TOKEN:",
+        placeholder: "your_auth_token",
+      });
+      if (p.isCancel(authToken)) process.exit(0);
+
+      const phoneNumber = await p.text({
+        message: "TWILIO_PHONE_NUMBER (your Twilio number, E.164 format):",
+        placeholder: "+12345678900",
+      });
+      if (p.isCancel(phoneNumber)) process.exit(0);
+
+      const verifyServiceSid = await p.text({
+        message:
+          "TWILIO_VERIFY_SERVICE_SID (leave blank to skip 2FA / Verify):",
+        placeholder: "VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      });
+      if (p.isCancel(verifyServiceSid)) process.exit(0);
+
+      componentOptions.env["TWILIO_ACCOUNT_SID"] = accountSid as string;
+      componentOptions.env["TWILIO_AUTH_TOKEN"] = authToken as string;
+      componentOptions.env["TWILIO_PHONE_NUMBER"] = phoneNumber as string;
+      if ((verifyServiceSid as string).trim()) {
+        componentOptions.env["TWILIO_VERIFY_SERVICE_SID"] =
+          verifyServiceSid as string;
+      }
+    }
+    // ----------------------------
+
     // --- PAYSTACK KEY PROMPTING ---
     if (component === "paystack") {
       p.note("Provide your Paystack API keys from the Paystack dashboard.");

@@ -168,6 +168,8 @@ export async function generateComponent(
     const sectionHeaders: Record<string, string> = {
       authjs: "# Auth.js Configuration",
       clerk: "# Clerk Configuration",
+      twilio: "# Twilio Configuration",
+      paystack: "# Paystack Configuration",
     };
     envContent += `\n${sectionHeaders[component] ?? `# ${component} Configuration`}\n`;
 
