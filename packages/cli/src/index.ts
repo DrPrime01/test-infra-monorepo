@@ -8,7 +8,7 @@ import crypto from "crypto";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { detectEnvironment, DetectedORM, PackageManager } from "./scanner.js";
-import { generateComponent, AuthOptions } from "./generator.js";
+import { generateComponent, ComponentOptions } from "./generator.js";
 
 const execFileAsync = util.promisify(execFile);
 const program = new Command();
@@ -47,6 +47,7 @@ function validateConfig(raw: unknown): {
   packageManager: PackageManager;
   orm: DetectedORM;
   basePath: string;
+  isAppRouter: boolean;
 } {
   if (!raw || typeof raw !== "object") {
     throw new Error("infra.json is malformed — expected a JSON object.");
@@ -69,6 +70,8 @@ function validateConfig(raw: unknown): {
     packageManager: c.packageManager as PackageManager,
     orm: c.orm as DetectedORM,
     basePath: c.basePath,
+    // Default to true for backward compat with infra.json files that predate this field
+    isAppRouter: typeof c.isAppRouter === "boolean" ? c.isAppRouter : true,
   };
 }
 
@@ -126,6 +129,7 @@ program
       packageManager: env.packageManager,
       orm: chosenORM,
       basePath: env.basePath,
+      isAppRouter: env.isAppRouter,
     };
 
     await fs.outputJson(configPath, config, { spaces: 2 });
@@ -142,7 +146,7 @@ program
   .command("add <component>")
   .description("Add a new infrastructure component to your project")
   .action(async (component: string) => {
-    const supported = ["stripe", "resend", "twilio", "authjs"];
+    const supported = ["stripe", "resend", "twilio", "authjs", "clerk"];
     if (!supported.includes(component)) {
       p.log.error(`Component "${component}" is not supported yet.`);
       p.log.info(`Available components: ${supported.join(", ")}`);
@@ -172,14 +176,15 @@ program
       process.exit(1);
     }
 
-    const { orm: chosenORM, packageManager: pm, basePath } = config;
+    const { orm: chosenORM, packageManager: pm, basePath, isAppRouter } = config;
 
-    // --- NEXT-AUTH PROVIDER PROMPTING ---
-    const authOptions: AuthOptions = {
+    const componentOptions: ComponentOptions = {
       providers: [],
       env: {},
+      isAppRouter,
     };
 
+    // --- AUTH.JS PROVIDER PROMPTING ---
     if (component === "authjs") {
       const providerSelection = await p.multiselect({
         message: "Which authentication providers do you want to configure?",
@@ -197,14 +202,14 @@ program
         process.exit(0);
       }
 
-      authOptions.providers = providerSelection as string[];
+      componentOptions.providers = providerSelection as string[];
 
-      if (authOptions.providers.length > 0) {
+      if (componentOptions.providers.length > 0) {
         p.note(
           "Provide your OAuth keys below. Leave blank to generate empty placeholders in your .env.local file.",
         );
 
-        for (const provider of authOptions.providers) {
+        for (const provider of componentOptions.providers) {
           const clientId = await p.text({
             message: `${provider.toUpperCase()} Client ID:`,
             placeholder: `Enter your ${provider} client ID...`,
@@ -217,19 +222,44 @@ program
           });
           if (p.isCancel(clientSecret)) process.exit(0);
 
-          authOptions.env[`AUTH_${provider.toUpperCase()}_ID`] =
+          componentOptions.env[`AUTH_${provider.toUpperCase()}_ID`] =
             clientId as string;
-          authOptions.env[`AUTH_${provider.toUpperCase()}_SECRET`] =
+          componentOptions.env[`AUTH_${provider.toUpperCase()}_SECRET`] =
             clientSecret as string;
         }
       }
 
       p.note("Generating a secure AUTH_SECRET automatically...", "Security");
-      authOptions.env["AUTH_SECRET"] = crypto
+      componentOptions.env["AUTH_SECRET"] = crypto
         .randomBytes(32)
         .toString("base64");
     }
     // ------------------------------------
+
+    // --- CLERK KEY PROMPTING ---
+    if (component === "clerk") {
+      p.note("Provide your Clerk API keys from the Clerk dashboard.");
+
+      const publishableKey = await p.text({
+        message: "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:",
+        placeholder: "pk_test_...",
+      });
+      if (p.isCancel(publishableKey)) process.exit(0);
+
+      const secretKey = await p.text({
+        message: "CLERK_SECRET_KEY:",
+        placeholder: "sk_test_...",
+      });
+      if (p.isCancel(secretKey)) process.exit(0);
+
+      componentOptions.env["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] =
+        publishableKey as string;
+      componentOptions.env["CLERK_SECRET_KEY"] = secretKey as string;
+      // Placeholder so the app boots locally before the webhook is configured
+      componentOptions.env["CLERK_WEBHOOK_SECRET"] =
+        "whsec_YOUR_WEBHOOK_SECRET_HERE";
+    }
+    // ---------------------------
 
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;
@@ -277,7 +307,7 @@ program
         projectRoot,
         chosenORM,
         component,
-        authOptions,
+        componentOptions,
       );
       installSpinner.stop(pc.green("Files generated."));
 
@@ -288,6 +318,11 @@ program
         AUTH_ADAPTER_SUPPORTED_ORMS.includes(chosenORM)
       ) {
         result.dependencies.push(`@auth/${chosenORM}-adapter`);
+      }
+
+      // Pages Router Clerk needs micro for raw body parsing in the webhook
+      if (component === "clerk" && !isAppRouter) {
+        result.dependencies.push("micro");
       }
 
       if (result.dependencies && result.dependencies.length > 0) {
