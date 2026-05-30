@@ -173,6 +173,14 @@ const FALLBACK_COMPONENTS = [
   "authjs",
   "clerk",
   "paystack",
+  "firebase",
+  "flutterwave",
+  "supabase",
+  "google-calendar",
+  "calendly",
+  "google-maps",
+  "strapi",
+  "sanity",
 ];
 const REGISTRY_MANIFEST_URL = `${process.env.INFRA_REGISTRY_BASE ?? "https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry"}/manifest.json`;
 
@@ -455,6 +463,429 @@ program
       componentOptions.env["NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"] = publicKey as string;
     }
     // ------------------------------
+
+    // --- FIREBASE SERVICE SELECTION + KEY PROMPTING ---
+    if (component === "firebase") {
+      const selectedServices = await p.multiselect({
+        message: "Which Firebase services do you want to add?",
+        options: [
+          {
+            value: "auth",
+            label: "Authentication",
+            hint: "Email, Google, GitHub sign-in + session cookies + middleware",
+          },
+          {
+            value: "firestore",
+            label: "Firestore",
+            hint: "Typed Admin SDK helpers (get, set, update, delete, query)",
+          },
+          {
+            value: "storage",
+            label: "Storage",
+            hint: "Signed upload/download URLs",
+          },
+          {
+            value: "messaging",
+            label: "Cloud Messaging",
+            hint: "FCM push notifications via Admin SDK",
+          },
+        ],
+        required: true,
+      });
+      if (p.isCancel(selectedServices)) {
+        p.cancel("Aborted.");
+        process.exit(0);
+      }
+      componentOptions.selectedServices = selectedServices as string[];
+
+      p.note(
+        "Firebase client config — from Firebase console → Project Settings → Your apps",
+        "Client SDK",
+      );
+
+      const apiKey = await p.text({
+        message: "NEXT_PUBLIC_FIREBASE_API_KEY:",
+        placeholder: "AIzaSy...",
+        validate: required("API key"),
+      });
+      if (p.isCancel(apiKey)) process.exit(0);
+
+      const authDomain = await p.text({
+        message: "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:",
+        placeholder: "your-project.firebaseapp.com",
+        validate: required("Auth domain"),
+      });
+      if (p.isCancel(authDomain)) process.exit(0);
+
+      const projectId = await p.text({
+        message: "NEXT_PUBLIC_FIREBASE_PROJECT_ID:",
+        placeholder: "your-project-id",
+        validate: required("Project ID"),
+      });
+      if (p.isCancel(projectId)) process.exit(0);
+
+      const storageBucket = await p.text({
+        message: "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:",
+        placeholder: "your-project.appspot.com",
+        validate: required("Storage bucket"),
+      });
+      if (p.isCancel(storageBucket)) process.exit(0);
+
+      const messagingSenderId = await p.text({
+        message: "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:",
+        validate: required("Messaging sender ID"),
+      });
+      if (p.isCancel(messagingSenderId)) process.exit(0);
+
+      const appId = await p.text({
+        message: "NEXT_PUBLIC_FIREBASE_APP_ID:",
+        placeholder: "1:123456789:web:abcdef",
+        validate: required("App ID"),
+      });
+      if (p.isCancel(appId)) process.exit(0);
+
+      p.note(
+        "Firebase Admin config — from Firebase console → Project Settings → Service Accounts → Generate new private key",
+        "Admin SDK",
+      );
+
+      const adminProjectId = await p.text({
+        message: "FIREBASE_ADMIN_PROJECT_ID:",
+        placeholder: "your-project-id",
+        validate: required("Admin project ID"),
+      });
+      if (p.isCancel(adminProjectId)) process.exit(0);
+
+      const adminClientEmail = await p.text({
+        message: "FIREBASE_ADMIN_CLIENT_EMAIL:",
+        placeholder: "firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com",
+        validate: required("Admin client email"),
+      });
+      if (p.isCancel(adminClientEmail)) process.exit(0);
+
+      const adminPrivateKey = await p.password({
+        message: "FIREBASE_ADMIN_PRIVATE_KEY (paste full PEM key including -----BEGIN/END----- lines):",
+        validate: required("Admin private key"),
+      });
+      if (p.isCancel(adminPrivateKey)) process.exit(0);
+
+      componentOptions.env["NEXT_PUBLIC_FIREBASE_API_KEY"] = apiKey as string;
+      componentOptions.env["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"] = authDomain as string;
+      componentOptions.env["NEXT_PUBLIC_FIREBASE_PROJECT_ID"] = projectId as string;
+      componentOptions.env["NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"] = storageBucket as string;
+      componentOptions.env["NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"] = messagingSenderId as string;
+      componentOptions.env["NEXT_PUBLIC_FIREBASE_APP_ID"] = appId as string;
+      componentOptions.env["FIREBASE_ADMIN_PROJECT_ID"] = adminProjectId as string;
+      componentOptions.env["FIREBASE_ADMIN_CLIENT_EMAIL"] = adminClientEmail as string;
+      componentOptions.env["FIREBASE_ADMIN_PRIVATE_KEY"] = adminPrivateKey as string;
+    }
+    // -------------------------------------------------
+
+    // --- FLUTTERWAVE KEY PROMPTING ---
+    if (component === "flutterwave") {
+      p.note(
+        "Provide your Flutterwave API keys from the Flutterwave dashboard (app.flutterwave.com).",
+      );
+
+      const secretKey = await p.password({
+        message: "FLW_SECRET_KEY:",
+        validate: required("Secret key"),
+      });
+      if (p.isCancel(secretKey)) process.exit(0);
+
+      // Public key is `NEXT_PUBLIC_*` — designed to ship to the browser for the inline popup.
+      const publicKey = await p.text({
+        message: "NEXT_PUBLIC_FLW_PUBLIC_KEY:",
+        placeholder: "FLWPUBK_TEST-...",
+        validate: required("Public key"),
+      });
+      if (p.isCancel(publicKey)) process.exit(0);
+
+      const webhookSecret = await p.password({
+        message:
+          "FLW_WEBHOOK_SECRET (set in Flutterwave dashboard → Settings → Webhooks):",
+        validate: required("Webhook secret"),
+      });
+      if (p.isCancel(webhookSecret)) process.exit(0);
+
+      componentOptions.env["FLW_SECRET_KEY"] = secretKey as string;
+      componentOptions.env["NEXT_PUBLIC_FLW_PUBLIC_KEY"] = publicKey as string;
+      componentOptions.env["FLW_WEBHOOK_SECRET"] = webhookSecret as string;
+    }
+    // ---------------------------------
+
+    // --- SUPABASE SERVICE SELECTION + KEY PROMPTING ---
+    if (component === "supabase") {
+      const selectedServices = await p.multiselect({
+        message: "Which Supabase services do you want to add?",
+        options: [
+          {
+            value: "auth",
+            label: "Auth",
+            hint: "Email/password + OAuth sign-in, signOut, getUser, session middleware",
+          },
+          {
+            value: "database",
+            label: "Database",
+            hint: "Typed query helpers (get, insert, update, delete, query) via service role",
+          },
+          {
+            value: "storage",
+            label: "Storage",
+            hint: "File upload, signed URLs, bucket management",
+          },
+          {
+            value: "realtime",
+            label: "Realtime",
+            hint: "Live table subscriptions and broadcast channels (client-side)",
+          },
+        ],
+        required: true,
+      });
+      if (p.isCancel(selectedServices)) {
+        p.cancel("Aborted.");
+        process.exit(0);
+      }
+      componentOptions.selectedServices = selectedServices as string[];
+
+      p.note(
+        "From your Supabase project dashboard → Settings → API",
+        "Supabase config",
+      );
+
+      const supabaseUrl = await p.text({
+        message: "NEXT_PUBLIC_SUPABASE_URL:",
+        placeholder: "https://xxxx.supabase.co",
+        validate: required("Supabase URL"),
+      });
+      if (p.isCancel(supabaseUrl)) process.exit(0);
+
+      const anonKey = await p.text({
+        message: "NEXT_PUBLIC_SUPABASE_ANON_KEY:",
+        placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        validate: required("Anon key"),
+      });
+      if (p.isCancel(anonKey)) process.exit(0);
+
+      const serviceRoleKey = await p.password({
+        message:
+          "SUPABASE_SERVICE_ROLE_KEY (server-only — never expose to client):",
+        validate: required("Service role key"),
+      });
+      if (p.isCancel(serviceRoleKey)) process.exit(0);
+
+      componentOptions.env["NEXT_PUBLIC_SUPABASE_URL"] = supabaseUrl as string;
+      componentOptions.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"] = anonKey as string;
+      componentOptions.env["SUPABASE_SERVICE_ROLE_KEY"] =
+        serviceRoleKey as string;
+
+      // Site URL only needed for OAuth redirect — skip if auth not selected.
+      if ((selectedServices as string[]).includes("auth")) {
+        const siteUrl = await p.text({
+          message:
+            "NEXT_PUBLIC_SITE_URL (used for OAuth redirect, e.g. http://localhost:3000):",
+          placeholder: "http://localhost:3000",
+          validate: required("Site URL"),
+        });
+        if (p.isCancel(siteUrl)) process.exit(0);
+        componentOptions.env["NEXT_PUBLIC_SITE_URL"] = siteUrl as string;
+      }
+    }
+    // --------------------------------------------------
+
+    // --- GOOGLE CALENDAR KEY PROMPTING ---
+    if (component === "google-calendar") {
+      p.note(
+        "From Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs.\nMake sure the Google Calendar API is enabled in your project.",
+        "Google Calendar config",
+      );
+
+      const clientId = await p.text({
+        message: "GOOGLE_CLIENT_ID:",
+        placeholder: "123456789-xxx.apps.googleusercontent.com",
+        validate: required("Client ID"),
+      });
+      if (p.isCancel(clientId)) process.exit(0);
+
+      const clientSecret = await p.password({
+        message: "GOOGLE_CLIENT_SECRET:",
+        validate: required("Client secret"),
+      });
+      if (p.isCancel(clientSecret)) process.exit(0);
+
+      const redirectUri = await p.text({
+        message: "GOOGLE_REDIRECT_URI:",
+        placeholder: "http://localhost:3000/api/auth/google-calendar/callback",
+        validate: required("Redirect URI"),
+      });
+      if (p.isCancel(redirectUri)) process.exit(0);
+
+      componentOptions.env["GOOGLE_CLIENT_ID"] = clientId as string;
+      componentOptions.env["GOOGLE_CLIENT_SECRET"] = clientSecret as string;
+      componentOptions.env["GOOGLE_REDIRECT_URI"] = redirectUri as string;
+    }
+    // -------------------------------------
+
+    // --- CALENDLY KEY PROMPTING ---
+    if (component === "calendly") {
+      p.note(
+        "From Calendly → Integrations → API & Webhooks → Personal Access Tokens.",
+        "Calendly config",
+      );
+
+      const accessToken = await p.password({
+        message: "CALENDLY_PERSONAL_ACCESS_TOKEN:",
+        validate: required("Personal access token"),
+      });
+      if (p.isCancel(accessToken)) process.exit(0);
+
+      // Webhook signing key is created separately in Calendly → Integrations → Webhooks.
+      const webhookSigningKey = await p.password({
+        message:
+          "CALENDLY_WEBHOOK_SIGNING_KEY (from Calendly → Integrations → Webhooks):",
+        validate: required("Webhook signing key"),
+      });
+      if (p.isCancel(webhookSigningKey)) process.exit(0);
+
+      componentOptions.env["CALENDLY_PERSONAL_ACCESS_TOKEN"] =
+        accessToken as string;
+      componentOptions.env["CALENDLY_WEBHOOK_SIGNING_KEY"] =
+        webhookSigningKey as string;
+    }
+    // ------------------------------
+
+    // --- GOOGLE MAPS SERVICE SELECTION + KEY PROMPTING ---
+    if (component === "google-maps") {
+      const selectedServices = await p.multiselect({
+        message: "Which Google Maps services do you want to add?",
+        options: [
+          {
+            value: "geocoding",
+            label: "Geocoding",
+            hint: "Convert addresses ↔ coordinates",
+          },
+          {
+            value: "places",
+            label: "Places",
+            hint: "Search places, get details, autocomplete",
+          },
+          {
+            value: "directions",
+            label: "Directions",
+            hint: "Get routes with steps and travel time",
+          },
+          {
+            value: "distance-matrix",
+            label: "Distance Matrix",
+            hint: "Travel time/distance between multiple origins and destinations",
+          },
+          {
+            value: "static-maps",
+            label: "Static Maps",
+            hint: "Generate map image URLs server-side",
+          },
+        ],
+        required: true,
+      });
+      if (p.isCancel(selectedServices)) {
+        p.cancel("Aborted.");
+        process.exit(0);
+      }
+      componentOptions.selectedServices = selectedServices as string[];
+
+      p.note(
+        "From Google Cloud Console → APIs & Services → Credentials → API Keys.\nEnable each selected API in your project.",
+        "Google Maps config",
+      );
+
+      const mapsApiKey = await p.password({
+        message: "GOOGLE_MAPS_API_KEY:",
+        validate: required("API key"),
+      });
+      if (p.isCancel(mapsApiKey)) process.exit(0);
+
+      componentOptions.env["GOOGLE_MAPS_API_KEY"] = mapsApiKey as string;
+    }
+    // -----------------------------------------------------
+
+    // --- STRAPI KEY PROMPTING ---
+    if (component === "strapi") {
+      p.note(
+        "From your Strapi admin panel → Settings → API Tokens (for the API token)\nand Settings → Webhooks (to set the Authorization header value).",
+        "Strapi config",
+      );
+
+      const strapiUrl = await p.text({
+        message: "STRAPI_URL (your Strapi instance URL):",
+        placeholder: "http://localhost:1337",
+        validate: required("Strapi URL"),
+      });
+      if (p.isCancel(strapiUrl)) process.exit(0);
+
+      const apiToken = await p.password({
+        message: "STRAPI_API_TOKEN (Settings → API Tokens):",
+        validate: required("API token"),
+      });
+      if (p.isCancel(apiToken)) process.exit(0);
+
+      const webhookSecret = await p.password({
+        message:
+          "STRAPI_WEBHOOK_SECRET (the Authorization header value you set in Strapi → Webhooks):",
+        validate: required("Webhook secret"),
+      });
+      if (p.isCancel(webhookSecret)) process.exit(0);
+
+      componentOptions.env["STRAPI_URL"] = strapiUrl as string;
+      componentOptions.env["STRAPI_API_TOKEN"] = apiToken as string;
+      componentOptions.env["STRAPI_WEBHOOK_SECRET"] = webhookSecret as string;
+    }
+    // ----------------------------
+
+    // --- SANITY KEY PROMPTING ---
+    if (component === "sanity") {
+      p.note(
+        "From your Sanity project dashboard → API → Tokens (for the API token)\nand API → Webhooks (to get the webhook secret).",
+        "Sanity config",
+      );
+
+      const projectId = await p.text({
+        message: "NEXT_PUBLIC_SANITY_PROJECT_ID:",
+        placeholder: "abc12def",
+        validate: required("Project ID"),
+      });
+      if (p.isCancel(projectId)) process.exit(0);
+
+      // Dataset defaults to "production" — allow blank input.
+      const dataset = await p.text({
+        message: "NEXT_PUBLIC_SANITY_DATASET (press Enter for \"production\"):",
+        placeholder: "production",
+      });
+      if (p.isCancel(dataset)) process.exit(0);
+
+      // Optional — public datasets work without a token.
+      const apiToken = await p.password({
+        message:
+          "SANITY_API_TOKEN (leave blank if your dataset is publicly readable):",
+      });
+      if (p.isCancel(apiToken)) process.exit(0);
+
+      const webhookSecret = await p.password({
+        message:
+          "SANITY_WEBHOOK_SECRET (the secret you set when creating the webhook):",
+        validate: required("Webhook secret"),
+      });
+      if (p.isCancel(webhookSecret)) process.exit(0);
+
+      componentOptions.env["NEXT_PUBLIC_SANITY_PROJECT_ID"] =
+        projectId as string;
+      componentOptions.env["NEXT_PUBLIC_SANITY_DATASET"] =
+        (dataset as string).trim() || "production";
+      if ((apiToken as string).trim()) {
+        componentOptions.env["SANITY_API_TOKEN"] = apiToken as string;
+      }
+      componentOptions.env["SANITY_WEBHOOK_SECRET"] = webhookSecret as string;
+    }
+    // ----------------------------
 
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;

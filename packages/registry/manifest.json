@@ -30,6 +30,46 @@
       "name": "clerk",
       "description": "Clerk authentication with sign-in/sign-up pages",
       "category": "auth"
+    },
+    {
+      "name": "firebase",
+      "description": "Firebase Auth, Firestore, Storage, and Cloud Messaging",
+      "category": "backend"
+    },
+    {
+      "name": "flutterwave",
+      "description": "Flutterwave inline payments + webhooks",
+      "category": "payments"
+    },
+    {
+      "name": "supabase",
+      "description": "Supabase Auth, Database, Storage, and Realtime",
+      "category": "backend"
+    },
+    {
+      "name": "google-calendar",
+      "description": "Google Calendar API with OAuth token management",
+      "category": "integrations"
+    },
+    {
+      "name": "calendly",
+      "description": "Calendly scheduling API + webhook handler",
+      "category": "integrations"
+    },
+    {
+      "name": "google-maps",
+      "description": "Google Maps Geocoding, Places, Directions, Distance Matrix, and Static Maps",
+      "category": "integrations"
+    },
+    {
+      "name": "strapi",
+      "description": "Strapi headless CMS REST API + webhook cache revalidation",
+      "category": "cms"
+    },
+    {
+      "name": "sanity",
+      "description": "Sanity headless CMS with GROQ queries + webhook cache revalidation",
+      "category": "cms"
     }
   ]
 }

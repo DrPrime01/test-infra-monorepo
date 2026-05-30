@@ -11,6 +11,7 @@ export interface ComponentOptions {
   providers?: string[];
   env: Record<string, string>;
   isAppRouter?: boolean;
+  selectedServices?: string[];
 }
 
 export interface GenerateResult {
@@ -194,7 +195,36 @@ export async function generateComponent(
   component: string,
   options?: ComponentOptions,
 ): Promise<GenerateResult> {
-  const payload = (await fetchRegistry(component)) as Record<string, unknown>;
+  const rawPayload = (await fetchRegistry(component)) as Record<string, unknown>;
+
+  // Firebase-style registry: assemble flat `files` from sharedFiles + selected serviceFiles.
+  // For all other components the payload passes through unchanged.
+  let payload: Record<string, unknown>;
+  if (
+    rawPayload.serviceFiles &&
+    typeof rawPayload.serviceFiles === "object" &&
+    options?.selectedServices &&
+    options.selectedServices.length > 0
+  ) {
+    type SvcDef = { files?: Record<string, string>; middlewareTemplates?: Record<string, string> };
+    const sharedFiles = (rawPayload.sharedFiles ?? {}) as Record<string, string>;
+    const serviceFilesMap = rawPayload.serviceFiles as Record<string, SvcDef>;
+    const assembledFiles: Record<string, string> = { ...sharedFiles };
+    let assembledMiddleware: Record<string, string> | undefined;
+    for (const svc of options.selectedServices) {
+      const svcDef = serviceFilesMap[svc];
+      if (!svcDef) continue;
+      Object.assign(assembledFiles, svcDef.files ?? {});
+      if (svcDef.middlewareTemplates) assembledMiddleware = svcDef.middlewareTemplates;
+    }
+    payload = {
+      ...rawPayload,
+      files: assembledFiles,
+      ...(assembledMiddleware ? { middlewareTemplates: assembledMiddleware } : {}),
+    };
+  } else {
+    payload = rawPayload;
+  }
 
   // Realpath the project root once — anchor for all symlink-aware checks.
   const realRoot = await fs.realpath(projectRoot);
@@ -338,6 +368,32 @@ export async function generateComponent(
           middlewareWrite = { target: sidecarPath, content: baseTemplate };
           warnings.push(
             `Existing ${interceptorFileName} detected — Clerk template written to ${path.basename(sidecarPath)} instead. Merge manually.`,
+          );
+        } else if (
+          component === "firebase" &&
+          !/from\s+['"]@\/infra\/firebase\/auth-server['"]/.test(existingContent)
+        ) {
+          const sidecarPath = path.join(
+            rootTargetDir,
+            `${path.basename(interceptorFileName, ".ts")}.firebase.example.ts`,
+          );
+          await assertSafePath(sidecarPath, realRoot);
+          middlewareWrite = { target: sidecarPath, content: baseTemplate };
+          warnings.push(
+            `Existing ${interceptorFileName} detected — Firebase template written to ${path.basename(sidecarPath)} instead. Merge manually.`,
+          );
+        } else if (
+          component === "supabase" &&
+          !/from\s+['"]@\/infra\/supabase['"]/.test(existingContent)
+        ) {
+          const sidecarPath = path.join(
+            rootTargetDir,
+            `${path.basename(interceptorFileName, ".ts")}.supabase.example.ts`,
+          );
+          await assertSafePath(sidecarPath, realRoot);
+          middlewareWrite = { target: sidecarPath, content: baseTemplate };
+          warnings.push(
+            `Existing ${interceptorFileName} detected — Supabase template written to ${path.basename(sidecarPath)} instead. Merge manually.`,
           );
         }
       } else {

@@ -143,7 +143,35 @@ async function writeFileAtomic(target, content, mode) {
     }
 }
 export async function generateComponent(projectRoot, orm, component, options) {
-    const payload = (await fetchRegistry(component));
+    const rawPayload = (await fetchRegistry(component));
+    // Firebase-style registry: assemble flat `files` from sharedFiles + selected serviceFiles.
+    // For all other components the payload passes through unchanged.
+    let payload;
+    if (rawPayload.serviceFiles &&
+        typeof rawPayload.serviceFiles === "object" &&
+        options?.selectedServices &&
+        options.selectedServices.length > 0) {
+        const sharedFiles = (rawPayload.sharedFiles ?? {});
+        const serviceFilesMap = rawPayload.serviceFiles;
+        const assembledFiles = { ...sharedFiles };
+        let assembledMiddleware;
+        for (const svc of options.selectedServices) {
+            const svcDef = serviceFilesMap[svc];
+            if (!svcDef)
+                continue;
+            Object.assign(assembledFiles, svcDef.files ?? {});
+            if (svcDef.middlewareTemplates)
+                assembledMiddleware = svcDef.middlewareTemplates;
+        }
+        payload = {
+            ...rawPayload,
+            files: assembledFiles,
+            ...(assembledMiddleware ? { middlewareTemplates: assembledMiddleware } : {}),
+        };
+    }
+    else {
+        payload = rawPayload;
+    }
     // Realpath the project root once — anchor for all symlink-aware checks.
     const realRoot = await fs.realpath(projectRoot);
     const hasSrcDirectory = await fs.pathExists(path.join(realRoot, "src"));
@@ -257,6 +285,20 @@ export async function generateComponent(projectRoot, orm, component, options) {
                     await assertSafePath(sidecarPath, realRoot);
                     middlewareWrite = { target: sidecarPath, content: baseTemplate };
                     warnings.push(`Existing ${interceptorFileName} detected — Clerk template written to ${path.basename(sidecarPath)} instead. Merge manually.`);
+                }
+                else if (component === "firebase" &&
+                    !/from\s+['"]@\/infra\/firebase\/auth-server['"]/.test(existingContent)) {
+                    const sidecarPath = path.join(rootTargetDir, `${path.basename(interceptorFileName, ".ts")}.firebase.example.ts`);
+                    await assertSafePath(sidecarPath, realRoot);
+                    middlewareWrite = { target: sidecarPath, content: baseTemplate };
+                    warnings.push(`Existing ${interceptorFileName} detected — Firebase template written to ${path.basename(sidecarPath)} instead. Merge manually.`);
+                }
+                else if (component === "supabase" &&
+                    !/from\s+['"]@\/infra\/supabase['"]/.test(existingContent)) {
+                    const sidecarPath = path.join(rootTargetDir, `${path.basename(interceptorFileName, ".ts")}.supabase.example.ts`);
+                    await assertSafePath(sidecarPath, realRoot);
+                    middlewareWrite = { target: sidecarPath, content: baseTemplate };
+                    warnings.push(`Existing ${interceptorFileName} detected — Supabase template written to ${path.basename(sidecarPath)} instead. Merge manually.`);
                 }
             }
             else {
