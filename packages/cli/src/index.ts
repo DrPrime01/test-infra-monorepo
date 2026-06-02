@@ -183,6 +183,7 @@ const FALLBACK_COMPONENTS = [
   "sanity",
   "contentful",
   "hygraph",
+  "sendgrid",
 ];
 const REGISTRY_MANIFEST_URL = `${process.env.INFRA_REGISTRY_BASE ?? "https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry"}/manifest.json`;
 
@@ -981,6 +982,44 @@ program
         hygraphWebhookSecret as string;
     }
     // -----------------------------
+
+    // --- SENDGRID KEY PROMPTING ---
+    if (component === "sendgrid") {
+      p.note(
+        "From your SendGrid account → Settings → API Keys.\nWebhook public key: Settings → Mail Settings → Event Webhooks → enable Signed Event Webhooks.",
+        "SendGrid config",
+      );
+
+      const sgApiKey = await p.password({
+        message: "SENDGRID_API_KEY:",
+        validate: required("API key"),
+      });
+      if (p.isCancel(sgApiKey)) process.exit(0);
+
+      const sgFromEmail = await p.text({
+        message:
+          "SENDGRID_FROM_EMAIL (verified sender address or \"Name <email>\"):",
+        placeholder: "Acme <noreply@acme.dev>",
+        validate: required("From email"),
+      });
+      if (p.isCancel(sgFromEmail)) process.exit(0);
+
+      // Optional — only needed if enabling Signed Event Webhooks.
+      const sgWebhookPublicKey = await p.text({
+        message:
+          "SENDGRID_WEBHOOK_PUBLIC_KEY (PEM public key from Event Webhooks settings — leave blank to skip):",
+        placeholder: "-----BEGIN PUBLIC KEY-----",
+      });
+      if (p.isCancel(sgWebhookPublicKey)) process.exit(0);
+
+      componentOptions.env["SENDGRID_API_KEY"] = sgApiKey as string;
+      componentOptions.env["SENDGRID_FROM_EMAIL"] = sgFromEmail as string;
+      if ((sgWebhookPublicKey as string).trim()) {
+        componentOptions.env["SENDGRID_WEBHOOK_PUBLIC_KEY"] =
+          sgWebhookPublicKey as string;
+      }
+    }
+    // ------------------------------
 
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;

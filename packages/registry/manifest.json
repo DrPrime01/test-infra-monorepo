@@ -80,6 +80,11 @@
       "name": "hygraph",
       "description": "Hygraph headless CMS with GraphQL queries + webhook cache revalidation",
       "category": "cms"
+    },
+    {
+      "name": "sendgrid",
+      "description": "SendGrid transactional email with Dynamic Templates + Event Webhook",
+      "category": "email"
     }
   ]
 }
