@@ -31,7 +31,7 @@ const DEFAULT_REGISTRY_BASE =
   "https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry";
 
 // Override at runtime to pin to a specific commit/tag, e.g.:
-//   INFRA_REGISTRY_BASE=https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/tags/v0.2.0/packages/registry
+//   INFRA_REGISTRY_BASE=https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/tags/v0.3.0/packages/registry
 const REGISTRY_BASE = process.env.INFRA_REGISTRY_BASE ?? DEFAULT_REGISTRY_BASE;
 
 const MAX_PAYLOAD_BYTES = 1_000_000;

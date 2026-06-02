@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name("infra-ui")
   .description("Add critical infrastructure components to your app")
-  .version("0.1.0");
+  .version("0.3.0");
 
 const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = [
   "npm",
@@ -181,6 +181,7 @@ const FALLBACK_COMPONENTS = [
   "google-maps",
   "strapi",
   "sanity",
+  "contentful",
 ];
 const REGISTRY_MANIFEST_URL = `${process.env.INFRA_REGISTRY_BASE ?? "https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry"}/manifest.json`;
 
@@ -886,6 +887,52 @@ program
       componentOptions.env["SANITY_WEBHOOK_SECRET"] = webhookSecret as string;
     }
     // ----------------------------
+
+    // --- CONTENTFUL KEY PROMPTING ---
+    if (component === "contentful") {
+      p.note(
+        "From your Contentful space → Settings → API Keys (for delivery/preview tokens)\nand Settings → Webhooks (to configure the x-contentful-secret header value).",
+        "Contentful config",
+      );
+
+      const spaceId = await p.text({
+        message: "CONTENTFUL_SPACE_ID:",
+        placeholder: "abc12def34gh",
+        validate: required("Space ID"),
+      });
+      if (p.isCancel(spaceId)) process.exit(0);
+
+      const deliveryToken = await p.password({
+        message: "CONTENTFUL_DELIVERY_TOKEN (Content Delivery API access token):",
+        validate: required("Delivery token"),
+      });
+      if (p.isCancel(deliveryToken)) process.exit(0);
+
+      // Optional — only needed for Next.js Draft Mode.
+      const previewToken = await p.password({
+        message:
+          "CONTENTFUL_PREVIEW_TOKEN (Content Preview API token — leave blank to skip Draft Mode):",
+      });
+      if (p.isCancel(previewToken)) process.exit(0);
+
+      const webhookSecret = await p.password({
+        message:
+          "CONTENTFUL_WEBHOOK_SECRET (the value you set as x-contentful-secret in Contentful → Webhooks):",
+        validate: required("Webhook secret"),
+      });
+      if (p.isCancel(webhookSecret)) process.exit(0);
+
+      componentOptions.env["CONTENTFUL_SPACE_ID"] = spaceId as string;
+      componentOptions.env["CONTENTFUL_DELIVERY_TOKEN"] =
+        deliveryToken as string;
+      if ((previewToken as string).trim()) {
+        componentOptions.env["CONTENTFUL_PREVIEW_TOKEN"] =
+          previewToken as string;
+      }
+      componentOptions.env["CONTENTFUL_WEBHOOK_SECRET"] =
+        webhookSecret as string;
+    }
+    // --------------------------------
 
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;
