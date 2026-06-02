@@ -75,6 +75,11 @@
       "name": "contentful",
       "description": "Contentful headless CMS with delivery + preview clients + webhook cache revalidation",
       "category": "cms"
+    },
+    {
+      "name": "hygraph",
+      "description": "Hygraph headless CMS with GraphQL queries + webhook cache revalidation",
+      "category": "cms"
     }
   ]
 }
