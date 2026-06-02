@@ -70,6 +70,11 @@
       "name": "sanity",
       "description": "Sanity headless CMS with GROQ queries + webhook cache revalidation",
       "category": "cms"
+    },
+    {
+      "name": "contentful",
+      "description": "Contentful headless CMS with delivery + preview clients + webhook cache revalidation",
+      "category": "cms"
     }
   ]
 }

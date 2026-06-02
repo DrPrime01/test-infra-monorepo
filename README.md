@@ -3,12 +3,14 @@
 [![npm version](https://img.shields.io/npm/v/@drprime/infra-ui)](https://www.npmjs.com/package/@drprime/infra-ui)
 [![license](https://img.shields.io/npm/l/@drprime/infra-ui)](LICENSE)
 
-A CLI that scaffolds production-ready backend infrastructure into your Next.js app — payments, auth, email, and communications — as real files you own, not dependencies you can't touch.
+A CLI that scaffolds production-ready backend infrastructure into your Next.js app — payments, auth, email, communications, backend platforms, third-party integrations, and headless CMSs — as real files you own, not dependencies you can't touch.
 
 ```bash
 npx @drprime/infra-ui init
 npx @drprime/infra-ui add stripe
 ```
+
+**15 components** across **7 categories** — pick what you need.
 
 ---
 
@@ -84,12 +86,34 @@ Commit this file. It's the source of truth for all future `add` commands.
 Fetches a component from the registry and writes it into your project.
 
 ```bash
+# Payments
 npx @drprime/infra-ui add stripe
+npx @drprime/infra-ui add paystack
+npx @drprime/infra-ui add flutterwave
+
+# Email
 npx @drprime/infra-ui add resend
+
+# Communications
 npx @drprime/infra-ui add twilio
+
+# Auth
 npx @drprime/infra-ui add authjs
 npx @drprime/infra-ui add clerk
-npx @drprime/infra-ui add paystack
+
+# Backend platforms
+npx @drprime/infra-ui add firebase
+npx @drprime/infra-ui add supabase
+
+# Third-party integrations
+npx @drprime/infra-ui add google-calendar
+npx @drprime/infra-ui add calendly
+npx @drprime/infra-ui add google-maps
+
+# Headless CMS
+npx @drprime/infra-ui add strapi
+npx @drprime/infra-ui add sanity
+npx @drprime/infra-ui add contentful
 ```
 
 The CLI will:
@@ -157,6 +181,35 @@ NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=
 ```
 
 **Amount note:** amounts are in the smallest currency unit (kobo for NGN). Multiply by 100.
+
+**ORM adapters:** Prisma, Drizzle, manual placeholder
+
+---
+
+#### `flutterwave`
+
+Flutterwave inline payments via `@flutterwave/flutterwave-react-v3` — popup opens client-side; webhook is the authoritative record.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/flutterwave/client.ts` | `flutterwaveRequest()` fetch helper with secret-key guard (`server-only`) |
+| `infra/flutterwave/actions.ts` | `initializePayment()` and `verifyTransaction()` server actions |
+| `infra/flutterwave/webhooks.ts` | `verif-hash` verification (timing-safe) + `handleFlutterwaveEvent()` |
+| `infra/flutterwave/checkout.tsx` | `<FlutterwaveCheckoutButton>` via the `useFlutterwave` hook |
+| `infra/flutterwave/adapter.ts` | ORM-specific `recordPayment()` keyed on `tx_ref` (idempotent) |
+| `app/api/webhooks/flutterwave/route.ts` | Webhook endpoint |
+
+**Env vars written:**
+
+```
+FLW_SECRET_KEY=
+NEXT_PUBLIC_FLW_PUBLIC_KEY=
+FLW_WEBHOOK_SECRET=
+```
+
+**Amount note:** amounts are in the smallest currency unit (kobo for NGN, cents for USD, etc).
 
 **ORM adapters:** Prisma, Drizzle, manual placeholder
 
@@ -276,6 +329,224 @@ TWILIO_WEBHOOK_BASE_URL=
 
 ---
 
+### Backend platforms
+
+Both Firebase and Supabase support a **multi-service prompt**: pick only the services you need (Auth, Database, Storage, etc) — the CLI generates only those files.
+
+#### `firebase`
+
+Firebase Auth, Firestore, Storage, and Cloud Messaging — with session-cookie auth, Admin SDK helpers, and Node-runtime middleware.
+
+**Always generated:**
+
+| File | Description |
+|------|-------------|
+| `infra/firebase/client.ts` | Browser SDK singleton |
+| `infra/firebase/admin.ts` | Admin SDK singleton — service account creds, `server-only` |
+
+**`auth` service (optional):** sign-in helpers, session-cookie create/verify with refresh-token revocation, 5-minute max-age check on ID tokens, `middleware.ts` with `runtime = "nodejs"`.
+**`firestore` service (optional):** typed `getDocument` / `setDocument` / `updateDocument` / `deleteDocument` / `queryDocuments`.
+**`storage` service (optional):** signed upload/download URLs + `deleteFile`, with path-traversal guards.
+**`messaging` service (optional):** `sendPushNotification` and `sendMulticast`.
+
+**Env vars written:**
+
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+FIREBASE_ADMIN_PROJECT_ID=
+FIREBASE_ADMIN_CLIENT_EMAIL=
+FIREBASE_ADMIN_PRIVATE_KEY=     # PEM, newlines preserved
+```
+
+---
+
+#### `supabase`
+
+Supabase Auth, Database, Storage, and Realtime — Edge-compatible middleware, `@supabase/ssr` based.
+
+**Always generated:**
+
+| File | Description |
+|------|-------------|
+| `infra/supabase/client.ts` | Browser client via `createBrowserClient` |
+| `infra/supabase/server.ts` | Server client via `createServerClient` (`server-only`) |
+| `infra/supabase/admin.ts` | Service-role client — bypasses RLS, `server-only` |
+
+**`auth` service (optional):** `signInWithEmail`, `signInWithOAuth`, `signOut`, `getUser` server actions + `/auth/callback` route with safe-redirect guards + Edge-compatible middleware.
+**`database` service (optional):** typed `getRow`/`insertRow`/`updateRow`/`deleteRow`/`queryRows`.
+**`storage` service (optional):** `uploadFile` (with `upsert: false` default + path validation), `getSignedUrl`, `deleteFile`, `createBucket`.
+**`realtime` service (optional):** `subscribeToTable` (with identifier validation) and `subscribeToChannel`.
+
+**Env vars written:**
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SITE_URL=           # only if auth service selected
+```
+
+---
+
+### Third-party integrations
+
+#### `google-calendar`
+
+Per-user Google Calendar access via OAuth 2.0, with automatic token refresh and HMAC-signed state to block account-link CSRF.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/google-calendar/token-store.ts` | Adapter wrapper for token persistence |
+| `infra/google-calendar/client.ts` | `createCalendarClient(userId)` — loads + refreshes tokens, `server-only` |
+| `infra/google-calendar/oauth.ts` | `getAuthorizationUrl` + `handleOAuthCallback` with HMAC-signed state |
+| `infra/google-calendar/events.ts` | `listEvents`, `createEvent`, `updateEvent`, `deleteEvent` |
+| `infra/google-calendar/adapter.ts` | ORM-specific `getTokens` / `saveTokens` |
+| `app/api/auth/google-calendar/callback/route.ts` | OAuth callback (verifies session matches state) |
+
+**Env vars written:**
+
+```
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=           # also used as HMAC key for state
+GOOGLE_REDIRECT_URI=
+```
+
+**ORM adapters:** Prisma, Drizzle, manual placeholder
+
+---
+
+#### `calendly`
+
+Calendly scheduling API + webhook handler with HMAC-SHA256 signature verification and 5-minute replay window.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/calendly/client.ts` | `calendlyRequest()` fetch helper, `server-only` |
+| `infra/calendly/actions.ts` | `getCurrentUser`, `listEventTypes`, `listScheduledEvents`, `getScheduledEvent`, `listInvitees` |
+| `infra/calendly/webhooks.ts` | `verifyWebhookSignature` (HMAC-SHA256 hex, replay-protected) + `handleCalendlyEvent` |
+| `app/api/webhooks/calendly/route.ts` | Webhook endpoint |
+
+**Env vars written:**
+
+```
+CALENDLY_PERSONAL_ACCESS_TOKEN=
+CALENDLY_WEBHOOK_SIGNING_KEY=
+```
+
+---
+
+#### `google-maps`
+
+Five selectable Google Maps services. No SDK — pure REST via the official endpoints. Multi-service prompt selects what to generate.
+
+**Always generated:**
+
+| File | Description |
+|------|-------------|
+| `infra/google-maps/client.ts` | `mapsRequest<T>()` helper, status-aware error handling, `server-only` |
+
+**Selectable services:**
+
+| Service | File | What it generates |
+|---------|------|-------------------|
+| `geocoding` | `geocoding.ts` | `geocodeAddress` ↔ `reverseGeocode` |
+| `places` | `places.ts` | `searchPlaces`, `getPlaceDetails`, `getAutocompleteSuggestions` |
+| `directions` | `directions.ts` | `getDirections` with waypoints + avoid options |
+| `distance-matrix` | `distance-matrix.ts` | `getDistances` for multi-origin × multi-destination grids |
+| `static-maps` | `static-maps.ts` | `fetchStaticMap()` (returns bytes) + `staticMapResponse()` (Next.js `Response`) — server-side only to keep the API key out of HTML |
+
+**Env vars written:**
+
+```
+GOOGLE_MAPS_API_KEY=            # server-side only
+```
+
+---
+
+### Headless CMS
+
+All three CMS components ship with **Next.js ISR cache invalidation** in their webhook handlers — content publishes auto-bust `revalidateTag(contentType)`.
+
+#### `strapi`
+
+Strapi v4/v5 REST API + webhook cache revalidation. Single API token, verbatim secret header verification.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/strapi/client.ts` | `strapiRequest<T>()` with Bearer auth, `server-only` |
+| `infra/strapi/actions.ts` | `findMany`, `findOne`, `findBySlug`, `create`, `update`, `deleteEntry` |
+| `infra/strapi/webhooks.ts` | `verifyWebhookSecret` (timing-safe) + `handleStrapiEvent` with `revalidateTag` |
+| `app/api/webhooks/strapi/route.ts` | Webhook endpoint (checks `Authorization` header) |
+
+**Env vars written:**
+
+```
+STRAPI_URL=
+STRAPI_API_TOKEN=
+STRAPI_WEBHOOK_SECRET=
+```
+
+---
+
+#### `sanity`
+
+Sanity CMS with GROQ queries via `@sanity/client`. HMAC-SHA256 base64url webhook signature + draft-document guard.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/sanity/client.ts` | `sanityClient` (`createClient`), `server-only` |
+| `infra/sanity/queries.ts` | `query<T>` escape hatch + `getDocumentsByType`, `getDocumentById`, `getBySlug` |
+| `infra/sanity/webhooks.ts` | `verifyWebhookSignature` (HMAC-SHA256 base64url, replay-protected) + `handleSanityEvent` |
+| `app/api/webhooks/sanity/route.ts` | Webhook endpoint (skips revalidation for `drafts.*` documents) |
+
+**Env vars written:**
+
+```
+NEXT_PUBLIC_SANITY_PROJECT_ID=
+NEXT_PUBLIC_SANITY_DATASET=       # defaults to "production"
+SANITY_API_TOKEN=                 # optional — public datasets work without it
+SANITY_WEBHOOK_SECRET=
+```
+
+---
+
+#### `contentful`
+
+Contentful with separate delivery + preview clients (for Next.js Draft Mode). Topic-aware webhook handler.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/contentful/client.ts` | `deliveryClient` (always) + lazy `getPreviewClient()`, `server-only` |
+| `infra/contentful/queries.ts` | `getEntriesByType`, `getEntryById`, `getEntryBySlug`, `getEntryPreview` |
+| `infra/contentful/webhooks.ts` | `verifyWebhookSecret` (timing-safe) + `handleContentfulEvent(payload, topic)` |
+| `app/api/webhooks/contentful/route.ts` | Reads both `x-contentful-secret` and `x-contentful-topic` headers |
+
+**Env vars written:**
+
+```
+CONTENTFUL_SPACE_ID=
+CONTENTFUL_DELIVERY_TOKEN=
+CONTENTFUL_PREVIEW_TOKEN=         # optional — Draft Mode only
+CONTENTFUL_WEBHOOK_SECRET=
+```
+
+---
+
 ## ORM Adapter Support
 
 When you run `infra-ui add`, the CLI reads the `orm` field from `infra.json` and writes an adapter to `infra/<component>/adapter.ts` matching your ORM:
@@ -286,7 +557,9 @@ When you run `infra-ui add`, the CLI reads the `orm` field from `infra.json` and
 | `drizzle-orm` | Drizzle queries with `onConflictDoUpdate` |
 | `manual` | Placeholder with `// TODO` comments |
 
-Switch adapters at any time by re-running `infra-ui add <component>` and choosing to overwrite.
+Components that ship adapters: **stripe, paystack, flutterwave, clerk, authjs, google-calendar.** Switch adapters at any time by re-running `infra-ui add <component>` and choosing to overwrite.
+
+Components like **firebase, supabase, strapi, sanity, contentful** don't ship adapters — they ARE the data layer, and the helpers in their `queries.ts` / `firestore.ts` / `db.ts` are what you call from your code.
 
 ---
 
@@ -312,7 +585,7 @@ Every `add` run updates `infra.lock.json` with:
   "stripe": {
     "files": ["infra/stripe/client.ts", "..."],
     "deps": ["stripe"],
-    "installedAt": "2026-05-24T12:00:00.000Z"
+    "installedAt": "2026-06-02T12:00:00.000Z"
   }
 }
 ```
@@ -339,11 +612,26 @@ INFRA_REGISTRY_BASE=http://localhost:3001 npx @drprime/infra-ui add stripe
 
 ## Security
 
+The CLI itself:
+
 - All secrets are collected via masked password prompts — never echoed to the terminal
-- Webhook handlers return `400` for missing/invalid signatures (no retry) and `500` for handler errors (retryable by the provider)
-- Path traversal and symlink escape protection on all file writes
-- Paystack webhook uses `crypto.timingSafeEqual` to prevent timing attacks
-- Twilio webhook reconstructs the public URL correctly behind proxies before validating the signature
+- Path traversal and symlink-escape protection on all file writes
+- Dependency names are validated against an npm-package regex before `npm install` (no shell injection)
+- Registry payloads are size-capped (1 MiB) and optionally SHA-256 verified
+
+What the generated components do:
+
+- **`import "server-only"`** in every file that uses secret env vars — guarantees admin/service tokens can never bundle into the client
+- **Webhook signature verification** uses `crypto.timingSafeEqual` in every component (Paystack HMAC-SHA512, Stripe + Calendly HMAC-SHA256 hex, Sanity HMAC-SHA256 base64url, Flutterwave/Strapi/Contentful verbatim secret)
+- **Replay-attack protection** with 5-minute timestamp tolerance on every HMAC-based webhook (Stripe, Calendly, Sanity)
+- **4xx/5xx separation** in webhook handlers: `400` for bad signatures (no retry), `500` for handler errors (retryable by the provider)
+- **Firebase session cookies** revoke server-side on sign-out (`revokeRefreshTokens`) and reject ID tokens older than 5 minutes when minting
+- **Supabase middleware** uses path-boundary matching (no `/sign-in-evil` bypass) and rejects open-redirect attempts via `next` param
+- **Google Calendar OAuth state** is HMAC-signed with a 10-minute window — prevents account-link CSRF
+- **Google Maps static maps** are fetched server-side; the API key never enters HTML or network traces visible to the browser
+- **Firebase + Supabase storage** paths reject `..`, null bytes, and leading `/`
+- **Supabase storage** defaults `upsert: false` so path collisions don't silently overwrite data
+- **Supabase realtime** identifiers are regex-validated; module docs spell out the RLS prerequisites
 
 ---
 
