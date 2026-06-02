@@ -1,0 +1,27 @@
+{
+  "dependencies": ["@neondatabase/serverless"],
+  "conditionalDeps": [
+    { "when": { "ormIn": ["prisma"] }, "deps": ["@prisma/adapter-neon"] }
+  ],
+  "envSectionHeader": "# Neon Database",
+  "sharedFiles": {
+    "client.ts": "import \"server-only\";\nimport { neon, Pool, neonConfig } from \"@neondatabase/serverless\";\n\nif (!process.env.DATABASE_URL) {\n  throw new Error(\"DATABASE_URL is missing from .env.local\");\n}\n\n/**\n * HTTP mode — tagged template literal for simple, one-shot queries.\n * True serverless: no persistent connection, fully Edge-compatible.\n * Use this for reads and simple writes inside Vercel Functions / Edge routes.\n *\n * Example:\n *   const rows = await sql`SELECT * FROM users WHERE id = ${userId}`;\n */\nexport const sql = neon(process.env.DATABASE_URL);\n\n/**\n * WebSocket/pool mode — persistent connection within a request.\n * Supports multi-statement transactions; required by @prisma/adapter-neon.\n * In Node.js environments you need a WebSocket constructor (see below);\n * Edge runtimes (Vercel Edge, Cloudflare Workers) have native WebSocket.\n *\n * Example:\n *   const client = await pool.connect();\n *   await client.query(\"BEGIN\");\n *   // ... queries ...\n *   await client.query(\"COMMIT\");\n *   client.release();\n */\nexport const pool = new Pool({ connectionString: process.env.DATABASE_URL });"
+  },
+  "serviceFiles": {
+    "prisma": {
+      "files": {
+        "adapter.ts": "import \"server-only\";\nimport { Pool, neonConfig } from \"@neondatabase/serverless\";\nimport { PrismaNeon } from \"@prisma/adapter-neon\";\nimport { PrismaClient } from \"@prisma/client\";\nimport ws from \"ws\";\n\n// Node.js requires an explicit WebSocket constructor; Edge runtimes have it natively.\nneonConfig.webSocketConstructor = ws;\n\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL });\nconst adapter = new PrismaNeon(pool);\n\n// Singleton pattern — prevents creating a new PrismaClient on every hot-reload\n// in development. In production each lambda instance has exactly one client.\nconst globalForPrisma = globalThis as unknown as { prisma: PrismaClient };\n\nexport const db =\n  globalForPrisma.prisma ?? new PrismaClient({ adapter });\n\nif (process.env.NODE_ENV !== \"production\") {\n  globalForPrisma.prisma = db;\n}"
+      }
+    },
+    "drizzle": {
+      "files": {
+        "adapter.ts": "import \"server-only\";\nimport { drizzle } from \"drizzle-orm/neon-http\";\nimport { neon } from \"@neondatabase/serverless\";\n\n// HTTP driver — no persistent connection, fully Edge-compatible.\n// Works on Vercel Functions, Edge Routes, and Cloudflare Workers.\nconst sql = neon(process.env.DATABASE_URL!);\n\nexport const db = drizzle({ client: sql });\n// Usage: import { db } from \"@/infra/neon/adapter\";\n// then: db.select().from(yourTable).where(eq(yourTable.id, id))"
+      }
+    },
+    "sql": {
+      "files": {
+        "db.ts": "\"use server\";\n\nimport { sql } from \"./client\";\n\n/**\n * Typed wrapper around the Neon HTTP tagged template literal.\n * Values are automatically parameterized — SQL injection is not possible\n * when using this interface.\n *\n * Example:\n *   const users = await query<User>`SELECT * FROM users WHERE id = ${userId}`;\n */\nexport async function query<T>(\n  strings: TemplateStringsArray,\n  ...values: unknown[]\n): Promise<T[]> {\n  return sql<T[]>(strings, ...values);\n}\n\n// Example helper — replace or expand with your own queries.\nexport async function getRows<T>(table: string): Promise<T[]> {\n  // sql.identifier() escapes the table name to prevent injection.\n  return sql<T[]>`SELECT * FROM ${sql.identifier(table)} LIMIT 100`;\n}"
+      }
+    }
+  }
+}

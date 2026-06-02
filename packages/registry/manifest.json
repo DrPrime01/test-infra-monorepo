@@ -85,6 +85,11 @@
       "name": "sendgrid",
       "description": "SendGrid transactional email with Dynamic Templates + Event Webhook",
       "category": "email"
+    },
+    {
+      "name": "neon",
+      "description": "Neon serverless Postgres — Edge-compatible client with Prisma, Drizzle, or raw SQL",
+      "category": "database"
     }
   ]
 }

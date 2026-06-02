@@ -144,6 +144,7 @@ const FALLBACK_COMPONENTS = [
     "contentful",
     "hygraph",
     "sendgrid",
+    "neon",
 ];
 const REGISTRY_MANIFEST_URL = `${process.env.INFRA_REGISTRY_BASE ?? "https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry"}/manifest.json`;
 async function getSupportedComponents() {
@@ -865,6 +866,50 @@ program
         }
     }
     // ------------------------------
+    // --- NEON KEY PROMPTING ---
+    if (component === "neon") {
+        p.note("From your Neon project dashboard → Connection Details → Connection string.\nUse the pooled connection string for Prisma; direct connection for Drizzle/raw SQL.", "Neon config");
+        const databaseUrl = await p.password({
+            message: "DATABASE_URL (Neon connection string):",
+            validate: required("Database URL"),
+        });
+        if (p.isCancel(databaseUrl))
+            process.exit(0);
+        // Pre-select the ORM based on what infra-ui init detected in this project.
+        const ormDefault = chosenORM === "prisma"
+            ? "prisma"
+            : chosenORM === "drizzle-orm"
+                ? "drizzle"
+                : "sql";
+        const ormChoice = await p.select({
+            message: "Which ORM are you using with Neon?",
+            initialValue: ormDefault,
+            options: [
+                {
+                    value: "prisma",
+                    label: "Prisma",
+                    hint: "PrismaClient with @prisma/adapter-neon — WebSocket/pool mode",
+                },
+                {
+                    value: "drizzle",
+                    label: "Drizzle ORM",
+                    hint: "drizzle(neon(url)) — HTTP mode, fully Edge-compatible",
+                },
+                {
+                    value: "sql",
+                    label: "None / raw SQL",
+                    hint: "sql`` tagged template — no ORM, parameterized queries",
+                },
+            ],
+        });
+        if (p.isCancel(ormChoice)) {
+            p.cancel("Aborted.");
+            process.exit(0);
+        }
+        componentOptions.selectedServices = [ormChoice];
+        componentOptions.env["DATABASE_URL"] = databaseUrl;
+    }
+    // --------------------------
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;
     const confirmInstall = await p.confirm({
