@@ -182,6 +182,7 @@ const FALLBACK_COMPONENTS = [
   "strapi",
   "sanity",
   "contentful",
+  "hygraph",
 ];
 const REGISTRY_MANIFEST_URL = `${process.env.INFRA_REGISTRY_BASE ?? "https://raw.githubusercontent.com/DrPrime01/test-infra-monorepo/refs/heads/main/packages/registry"}/manifest.json`;
 
@@ -933,6 +934,53 @@ program
         webhookSecret as string;
     }
     // --------------------------------
+
+    // --- HYGRAPH KEY PROMPTING ---
+    if (component === "hygraph") {
+      p.note(
+        "From your Hygraph project → Project Settings → API Access.\nWebhook secret: Project Settings → Webhooks → Add Webhook → custom header value.",
+        "Hygraph config",
+      );
+
+      const apiUrl = await p.text({
+        message: "HYGRAPH_API_URL (Content API endpoint):",
+        placeholder: "https://api-eu-west-2.hygraph.com/v2/xxx/master",
+        validate: required("API URL"),
+      });
+      if (p.isCancel(apiUrl)) process.exit(0);
+
+      // Optional — public Hygraph endpoints work without a token.
+      const apiToken = await p.password({
+        message:
+          "HYGRAPH_API_TOKEN (leave blank if content is publicly readable):",
+      });
+      if (p.isCancel(apiToken)) process.exit(0);
+
+      // Optional — only needed for Next.js Draft Mode / preview.
+      const previewUrl = await p.text({
+        message: "HYGRAPH_PREVIEW_URL (leave blank to skip Draft Mode):",
+        placeholder: "https://api-eu-west-2.hygraph.com/v2/xxx/master",
+      });
+      if (p.isCancel(previewUrl)) process.exit(0);
+
+      const hygraphWebhookSecret = await p.password({
+        message:
+          "HYGRAPH_WEBHOOK_SECRET (the gcms-webhook-signature header value you set in Hygraph Webhooks):",
+        validate: required("Webhook secret"),
+      });
+      if (p.isCancel(hygraphWebhookSecret)) process.exit(0);
+
+      componentOptions.env["HYGRAPH_API_URL"] = apiUrl as string;
+      if ((apiToken as string).trim()) {
+        componentOptions.env["HYGRAPH_API_TOKEN"] = apiToken as string;
+      }
+      if ((previewUrl as string).trim()) {
+        componentOptions.env["HYGRAPH_PREVIEW_URL"] = previewUrl as string;
+      }
+      componentOptions.env["HYGRAPH_WEBHOOK_SECRET"] =
+        hygraphWebhookSecret as string;
+    }
+    // -----------------------------
 
     // authjs files are written into infra/auth/ — show the real path
     const displayComponent = component === "authjs" ? "auth" : component;
