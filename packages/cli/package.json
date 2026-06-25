@@ -3,12 +3,40 @@
   "version": "0.3.0",
   "description": "Add critical headless infrastructure components to your app",
   "type": "module",
+  "license": "MIT",
+  "author": "DrPrime01",
+  "homepage": "https://github.com/DrPrime01/test-infra-monorepo#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DrPrime01/test-infra-monorepo.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/DrPrime01/test-infra-monorepo/issues"
+  },
+  "keywords": [
+    "nextjs",
+    "scaffolding",
+    "cli",
+    "infrastructure",
+    "stripe",
+    "auth",
+    "webhooks",
+    "prisma",
+    "drizzle",
+    "boilerplate"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/index.js",
   "bin": {
     "infra-ui": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",

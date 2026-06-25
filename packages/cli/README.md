@@ -10,7 +10,7 @@ npx @drprime/infra-ui init
 npx @drprime/infra-ui add stripe
 ```
 
-**15 components** across **7 categories** — pick what you need.
+**18 components** across **8 categories** — pick what you need.
 
 ---
 
@@ -93,6 +93,7 @@ npx @drprime/infra-ui add flutterwave
 
 # Email
 npx @drprime/infra-ui add resend
+npx @drprime/infra-ui add sendgrid
 
 # Communications
 npx @drprime/infra-ui add twilio
@@ -114,6 +115,10 @@ npx @drprime/infra-ui add google-maps
 npx @drprime/infra-ui add strapi
 npx @drprime/infra-ui add sanity
 npx @drprime/infra-ui add contentful
+npx @drprime/infra-ui add hygraph
+
+# Database
+npx @drprime/infra-ui add neon
 ```
 
 The CLI will:
@@ -294,6 +299,31 @@ Transactional email via Resend with a typed `sendEmail` server action.
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 ```
+
+---
+
+#### `sendgrid`
+
+SendGrid transactional email with Dynamic Templates plus an Event Webhook for delivery tracking (bounces, unsubscribes, spam reports).
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/sendgrid/client.ts` | `@sendgrid/mail` client (`sgMail.setApiKey`), `server-only` |
+| `infra/sendgrid/actions.ts` | `sendEmail()` (raw HTML) + `sendWithTemplate()` (Dynamic Templates) |
+| `infra/sendgrid/webhooks.ts` | ECDSA P-256 signature verification + `handleSendGridEvents()` (event batch) |
+| `app/api/webhooks/sendgrid/route.ts` | Event Webhook endpoint |
+
+**Env vars written:**
+
+```
+SENDGRID_API_KEY=
+SENDGRID_FROM_EMAIL=
+SENDGRID_WEBHOOK_PUBLIC_KEY=     # optional — only for Signed Event Webhooks
+```
+
+**Signature note:** the Event Webhook is verified with ECDSA P-256 (`crypto.verify` with `dsaEncoding: "ieee-p1363"`) — the public key comes from SendGrid's Signed Event Webhooks settings.
 
 ---
 
@@ -544,6 +574,62 @@ CONTENTFUL_DELIVERY_TOKEN=
 CONTENTFUL_PREVIEW_TOKEN=         # optional — Draft Mode only
 CONTENTFUL_WEBHOOK_SECRET=
 ```
+
+---
+
+#### `hygraph`
+
+Hygraph (formerly GraphCMS) — GraphQL-native CMS via `graphql-request`, with ISR cache tags threaded through each query and webhook revalidation.
+
+**Generated files:**
+
+| File | Description |
+|------|-------------|
+| `infra/hygraph/client.ts` | `hygraphClient` + lazy `getPreviewClient()`, `server-only` |
+| `infra/hygraph/queries.ts` | `query<T>`, `getEntriesByModel`, `getEntryBySlug`, `getEntryById`, `getEntryPreview` |
+| `infra/hygraph/webhooks.ts` | `verifyWebhookSecret` (timing-safe) + `handleHygraphEvent` keyed on `__typename` |
+| `app/api/webhooks/hygraph/route.ts` | Reads the `gcms-webhook-signature` header |
+
+**Env vars written:**
+
+```
+HYGRAPH_API_URL=
+HYGRAPH_API_TOKEN=               # optional — public endpoints work without it
+HYGRAPH_PREVIEW_URL=             # optional — Draft Mode only
+HYGRAPH_WEBHOOK_SECRET=
+```
+
+**ISR note:** queries pass `next: { tags: [...] }` through a custom `fetch` so `revalidateTag()` in the webhook handler busts the right cache entries.
+
+---
+
+### Database
+
+#### `neon`
+
+Neon serverless Postgres. Pick your layer at install time — **Prisma**, **Drizzle**, or **raw SQL** — pre-selected from the ORM detected during `infra-ui init`.
+
+**Always generated:**
+
+| File | Description |
+|------|-------------|
+| `infra/neon/client.ts` | `sql` — Neon HTTP query function (Edge-compatible, parameterized), `server-only` |
+
+**Per ORM choice:**
+
+| Choice | File | What it generates |
+|--------|------|-------------------|
+| Prisma | `adapter.ts` | `PrismaClient` with `@prisma/adapter-neon` + WebSocket pool, singleton hot-reload guard |
+| Drizzle | `adapter.ts` | `drizzle(neon(url))` via `drizzle-orm/neon-http` — fully Edge-compatible |
+| None / raw SQL | `db.ts` | `query<T>` tagged-template helper + an allowlisted `getRows<T>` example, `server-only` |
+
+**Env vars written:**
+
+```
+DATABASE_URL=
+```
+
+**Composition:** Neon is just the database — it sits under your ORM, not beside it. Prisma users get `@prisma/adapter-neon` + `ws` installed automatically via `conditionalDeps`.
 
 ---
 
